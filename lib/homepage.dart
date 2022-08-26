@@ -1,7 +1,12 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:map_launcher/map_launcher.dart';
+import 'package:point_in_polygon/point_in_polygon.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -11,6 +16,92 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    getToken();
+  }
+
+  Future<void> getToken() async {
+    final fcmToken = await FirebaseMessaging.instance.getToken();
+    await FirebaseFirestore.instance
+        .collection('NDRFPeople')
+        .add({'fcm': fcmToken});
+    print(fcmToken);
+  }
+
+  bool areCoordinatesInside(double x, double y) {
+    return Poly.isPointInPolygon(Point(x: x, y: y), points);
+  }
+
+  void sendPushMessage(String token, String body, String title) async {
+    NotificationSettings settings =
+        await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
+    try {
+      var response = await http.post(
+        Uri.parse('https://fcm.googleapis.com/fcm/send'),
+        headers: <String, String>{
+          'Content-Type': 'application/json',
+          'Authorization':
+              'key=AAAATGzh-UY:APA91bFI9YL6ROWjfShqGVT5BdaXFQpr3kjkudMuAbSIhCtS0WuypihBUT0rU23o64k1-PWiMzD1tSaeRKygHiHqk2FXo_gpqQyFsQ6IFXOyXdpOE-M-ONGsPNo2zsccOETEdbaUEpTZ',
+        },
+        body: jsonEncode(
+          <String, dynamic>{
+            'notification': <String, dynamic>{'body': body, 'title': title},
+            'android': {'priority': 'high'},
+            'data': <String, dynamic>{
+              'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+              'id': '1',
+              'status': 'done'
+            },
+            "to": token,
+            "apns": {
+              "payload": {
+                "aps": {"contentAvailable": "true"}
+              },
+              "headers": {
+                "apns-push-type": "background",
+                "apns-priority": "5",
+                "apns-topic": "io.flutter.plugins.firebase.messaging"
+              }
+            }
+          },
+        ),
+      );
+      print(response.body);
+    } catch (e) {
+      print("error push notification");
+    }
+  }
+
+  List<Point> points = [];
+  // void sendAlerts() {
+  //   FirebaseFirestore.instance.collection('People').get().then((query) {
+  //     query.docs.forEach((doc) {
+  //       if (areCoordinatesInside(double.parse(doc.data()['coordinates'][1]),
+  //               double.parse(doc.data()['coordinates'][0])) &&
+  //           // int.parse(Discharge.text) > 6000) {
+  //         // print(doc.data()['fcm']);
+  //         sendPushMessage(
+  //             doc.data()['fcm'],
+  //             'This is to notify that a flood warning is been issued in your area',
+  //             'Flood Alert');
+  //         // sendSms('${doc.data()['number']}');
+  //       } else {
+  //         print('Not inside the region');
+  //       }
+  //     });
+  //   });
+
   openMapsSheet(context) async {
     try {
       final coords = Coords(17.6951101327645, 75.28089164849547);
@@ -96,8 +187,9 @@ class _HomePageState extends State<HomePage> {
                                       // height: 200,
                                       width: 300,
                                       decoration: BoxDecoration(
-                                          color: Color.fromARGB(
-                                              255, 219, 219, 219),
+                                          color: course['severity'] == "Extreme"
+                                              ? Colors.redAccent
+                                              : Colors.orange,
                                           borderRadius:
                                               BorderRadius.circular(20)),
                                       child: Padding(
@@ -127,14 +219,14 @@ class _HomePageState extends State<HomePage> {
                                                           "${course['severity']} ",
                                                       style: TextStyle(
                                                           fontSize: 15,
-                                                          fontWeight:
-                                                              FontWeight.w600,
+                                                          fontWeight: FontWeight
+                                                              .w600,
                                                           color:
                                                               course['severity'] ==
                                                                       'Extreme'
-                                                                  ? Colors.red
+                                                                  ? Colors.white
                                                                   : Colors
-                                                                      .orange)),
+                                                                      .white)),
                                                 ])),
                                             // Text("Severity: ${course['severity']}"),
                                             SizedBox(

@@ -38,6 +38,10 @@ dependencies:
   cloud_firestore:
   url_launcher: ^6.1.5
   map_launcher: ^2.3.0+1
+  firebase_messaging:
+  flutter_local_notifications:
+  point_in_polygon: 
+  http: ^0.13.5
 
 dev_dependencies:
   flutter_test:
